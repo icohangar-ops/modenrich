@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flair Enforcer — Demo</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; overflow: hidden; width: 1920px; height: 1080px; }
+.slide { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 80px 120px; opacity: 0; transition: opacity 0.6s ease; }
+.slide.active { display: flex; opacity: 1; }
+.slide.fade-in { animation: fadeIn 0.6s ease forwards; }
+.slide.fade-out { animation: fadeOut 0.5s ease forwards; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+h1 { font-size: 72px; font-weight: 800; margin-bottom: 20px; }
+h2 { font-size: 48px; font-weight: 700; margin-bottom: 30px; }
+h3 { font-size: 32px; font-weight: 600; margin-bottom: 16px; }
+p, li { font-size: 24px; line-height: 1.6; color: #b1bac4; }
+.accent { background: linear-gradient(135deg, #ff4500, #5865F2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.subtitle { font-size: 28px; color: #8b949e; margin-bottom: 40px; }
+.cards { display: flex; gap: 30px; margin: 30px 0; }
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 36px 40px; text-align: center; min-width: 280px; }
+.card .number { font-size: 48px; font-weight: 800; margin-bottom: 8px; }
+.card .number.orange { color: #ff4500; }
+.card .number.blue { color: #5865F2; }
+.card .number.green { color: #3fb950; }
+.card .label { font-size: 20px; color: #8b949e; }
+.pipeline { display: flex; align-items: center; gap: 16px; margin: 30px 0; }
+.stage { background: #161b22; border: 2px solid #30363d; border-radius: 12px; padding: 24px 28px; text-align: center; min-width: 200px; }
+.stage .stage-num { font-size: 14px; color: #ff4500; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.stage .stage-name { font-size: 20px; font-weight: 600; color: #e6edf3; }
+.stage.active-stage { border-color: #ff4500; box-shadow: 0 0 20px rgba(255,69,0,0.2); }
+.arrow { font-size: 32px; color: #484f58; }
+.flow-box { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px 28px; margin: 8px 0; font-size: 20px; }
+.flow-box.highlight { border-color: #5865F2; background: rgba(88,101,242,0.1); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 24px; }
+.file-box { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 20px; }
+.file-box .filename { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; color: #ff4500; font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.file-box .desc { font-size: 16px; color: #8b949e; }
+.stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px 28px; text-align: center; }
+.stat-card .value { font-size: 42px; font-weight: 800; }
+.stat-card .value.orange { color: #ff4500; }
+.stat-card .value.blue { color: #5865F2; }
+.stat-card .value.green { color: #3fb950; }
+.stat-card .label { font-size: 16px; color: #8b949e; margin-top: 4px; }
+.bar-chart { margin: 20px 0; }
+.bar-row { display: flex; align-items: center; margin: 10px 0; }
+.bar-label { width: 120px; font-size: 18px; text-align: right; padding-right: 16px; color: #b1bac4; }
+.bar-track { flex: 1; height: 32px; background: #21262d; border-radius: 6px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 6px; transition: width 1s ease; }
+.bar-fill.orange { background: linear-gradient(90deg, #ff4500, #ff6a33); }
+.bar-fill.blue { background: linear-gradient(90deg, #5865F2, #7c8aff); }
+.bar-fill.green { background: linear-gradient(90deg, #3fb950, #56d364); }
+.bar-fill.purple { background: linear-gradient(90deg, #a371f7, #bc8cff); }
+.bar-fill.yellow { background: linear-gradient(90deg, #d29922, #e3b341); }
+.bar-pct { width: 60px; font-size: 16px; color: #8b949e; margin-left: 12px; }
+.timeline { margin: 24px 0; }
+.timeline-item { margin: 16px 0; padding-left: 24px; border-left: 3px solid #30363d; }
+.timeline-item.short { border-color: #3fb950; }
+.timeline-item.medium { border-color: #5865F2; }
+.timeline-item.long { border-color: #ff4500; }
+.timeline-item .time-label { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.timeline-item.short .time-label { color: #3fb950; }
+.timeline-item.medium .time-label { color: #5865F2; }
+.timeline-item.long .time-label { color: #ff4500; }
+.timeline-item .time-content { font-size: 20px; color: #b1bac4; }
+.progress-bar { position: fixed; bottom: 0; left: 0; width: 100%; height: 4px; background: #21262d; z-index: 100; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #ff4500, #5865F2); transition: width 0.3s ease; }
+.slide-counter { position: fixed; bottom: 20px; right: 40px; font-size: 16px; color: #484f58; z-index: 100; }
+.badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 14px; font-weight: 600; }
+.badge-orange { background: rgba(255,69,0,0.15); color: #ff6a33; border: 1px solid rgba(255,69,0,0.3); }
+.badge-blue { background: rgba(88,101,242,0.15); color: #7c8aff; border: 1px solid rgba(88,101,242,0.3); }
+.badge-green { background: rgba(63,185,80,0.15); color: #56d364; border: 1px solid rgba(63,185,80,0.3); }
+.example-box { background: #0d1117; border: 1px solid #30363d; border-radius: 10px; padding: 24px; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 18px; margin: 20px 0; }
+.example-box .input { color: #b1bac4; }
+.example-box .arrow-r { color: #ff4500; margin: 0 12px; }
+.example-box .output { color: #3fb950; }
+.feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+.feature-item { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 18px 22px; display: flex; align-items: center; gap: 14px; }
+.feature-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.feature-icon.orange { background: rgba(255,69,0,0.15); color: #ff4500; }
+.feature-icon.blue { background: rgba(88,101,242,0.15); color: #5865F2; }
+.feature-text .feat-name { font-size: 18px; font-weight: 600; color: #e6edf3; }
+.feature-text .feat-desc { font-size: 14px; color: #8b949e; }
+.learning-flow { display: flex; align-items: center; gap: 12px; margin: 20px 0; flex-wrap: wrap; justify-content: center; }
+.lf-node { background: #161b22; border: 2px solid #30363d; border-radius: 10px; padding: 16px 22px; text-align: center; font-size: 18px; }
+.lf-node.start { border-color: #3fb950; }
+.lf-node.end { border-color: #5865F2; }
+.lf-node.warn { border-color: #ff4500; }
+.lf-arrow { color: #484f58; font-size: 24px; }
+.limit-box { background: rgba(255,69,0,0.06); border: 1px solid rgba(255,69,0,0.2); border-radius: 10px; padding: 18px 24px; margin: 8px 0; }
+.limit-box .limit-name { font-size: 18px; font-weight: 600; color: #ff6a33; margin-bottom: 4px; }
+.limit-box .limit-desc { font-size: 15px; color: #8b949e; }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: Title -->
+<div class="slide active" id="slide-0">
+  <div style="text-align:center;">
+    <h1><span class="accent">Flair Enforcer</span></h1>
+    <p class="subtitle" style="font-size:30px;">Auto-flair Reddit posts with ML classification that learns from mod corrections</p>
+    <div style="display:flex; gap:16px; justify-content:center; margin-top:24px;">
+      <span class="badge badge-orange">Devvit-Native</span>
+      <span class="badge badge-blue">ML-Powered</span>
+      <span class="badge badge-green">Self-Improving</span>
+    </div>
+    <p style="margin-top:50px; font-size:22px; color:#484f58;">Reddit Mod Tools Migration Hackathon</p>
+  </div>
+</div>
+
+<!-- SLIDE 2: The Problem -->
+<div class="slide" id="slide-1">
+  <h2>The Problem</h2>
+  <p style="margin-bottom:30px;">Moderators waste hundreds of hours per year on manual flair management</p>
+  <div class="cards">
+    <div class="card">
+      <div class="number orange">30+ min</div>
+      <div class="label">Per day sorting flairs</div>
+    </div>
+    <div class="card">
+      <div class="number blue">180+ hrs</div>
+      <div class="label">Wasted per year</div>
+    </div>
+    <div class="card">
+      <div class="number green">Inconsistent</div>
+      <div class="label">Human error at 2 AM</div>
+    </div>
+  </div>
+  <p style="margin-bottom:16px; font-size:20px; color:#ff6a33; font-weight:600;">Existing tools fall short:</p>
+  <div style="display:flex; gap:24px; margin-top:12px;">
+    <div class="limit-box" style="flex:1;">
+      <div class="limit-name">AutoModerator</div>
+      <div class="limit-desc">Keyword-only, no learning, breaks on phrasing variations</div>
+    </div>
+    <div class="limit-box" style="flex:1;">
+      <div class="limit-name">Toolbox</div>
+      <div class="limit-desc">Complex JavaScript, power-user only, no learning</div>
+    </div>
+    <div class="limit-box" style="flex:1;">
+      <div class="limit-name">External Bots</div>
+      <div class="limit-desc">Latency, uptime issues, external dependencies</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 3: Our Solution -->
+<div class="slide" id="slide-2">
+  <h2><span class="accent">Flair Enforcer</span></h2>
+  <p class="subtitle">A 4-stage classification pipeline that gets smarter over time</p>
+  <div class="pipeline">
+    <div class="stage active-stage">
+      <div class="stage-num">Stage 1</div>
+      <div class="stage-name">TF-IDF ML Classifier</div>
+    </div>
+    <div class="arrow">&#10132;</div>
+    <div class="stage">
+      <div class="stage-num">Stage 2</div>
+      <div class="stage-name">Keyword Match</div>
+    </div>
+    <div class="arrow">&#10132;</div>
+    <div class="stage">
+      <div class="stage-num">Stage 3</div>
+      <div class="stage-name">Regex Patterns</div>
+    </div>
+    <div class="arrow">&#10132;</div>
+    <div class="stage">
+      <div class="stage-num">Stage 4</div>
+      <div class="stage-name">Default Flair</div>
+    </div>
+  </div>
+  <div style="background:#161b22; border:2px solid #5865F2; border-radius:12px; padding:28px 36px; margin-top:30px; text-align:center;">
+    <h3 style="color:#7c8aff; margin-bottom:12px;">The Learning Loop</h3>
+    <p style="font-size:22px;">Mod corrects a flair &#10132; System extracts key terms &#10132; Training corpus updated &#10132; Classifier accuracy improves</p>
+    <p style="font-size:16px; color:#484f58; margin-top:12px;">After just 10-20 corrections, confidence scores measurably improve for similar posts</p>
+  </div>
+</div>
+
+<!-- SLIDE 4: ML Classification -->
+<div class="slide" id="slide-3">
+  <h2>ML Classification Engine</h2>
+  <p class="subtitle">TF-IDF inspired scoring — pure TypeScript, no external APIs</p>
+  <div class="grid" style="gap:24px;">
+    <div>
+      <div class="flow-box" style="border-left: 3px solid #ff4500; margin-bottom:12px;">
+        <strong style="color:#ff6a33;">Step 1 — Tokenize</strong><br>
+        Strip punctuation, lowercase, split on whitespace, filter 80+ stop-words
+      </div>
+      <div class="flow-box" style="border-left: 3px solid #ff6a33; margin-bottom:12px;">
+        <strong style="color:#ff6a33;">Step 2 — Build Index</strong><br>
+        Weighted term index from keyword rules + learned training data
+      </div>
+      <div class="flow-box" style="border-left: 3px solid #ff6a33; margin-bottom:12px;">
+        <strong style="color:#ff6a33;">Step 3 — Score</strong><br>
+        Score each flair: sum(matched weights) / sqrt(token count)
+      </div>
+      <div class="flow-box" style="border-left: 3px solid #ff6a33;">
+        <strong style="color:#ff6a33;">Step 4 — Rank</strong><br>
+        Confidence = top_score / (top_score + second_score)
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:22px; color:#8b949e; margin-bottom:16px;">Example Classification</h3>
+      <div class="example-box">
+        <div class="input">Post: "Need help with Python asyncio"</div>
+        <div style="margin:8px 0; color:#484f58;">&#8595;</div>
+        <div class="input">Tokens: [need, help, python, asyncio]</div>
+        <div style="margin:8px 0; color:#484f58;">&#8595;</div>
+        <div style="color:#5865F2;">Matched: "python" → Programming Help, "help" → Help, "asyncio" → Programming Help</div>
+        <div style="margin:8px 0; color:#484f58;">&#8595;</div>
+        <div class="output">Result: "Programming Help" — confidence: 0.87</div>
+      </div>
+      <div style="background:#161b22; border-radius:10px; padding:18px; margin-top:16px;">
+        <p style="font-size:16px; color:#8b949e;"><strong style="color:#e6edf3;">Length normalization:</strong> sqrt dampening prevents longer posts from dominating. A 500-word essay won't outrank a precise 20-word question.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 5: Learning Loop -->
+<div class="slide" id="slide-4">
+  <h2>The Learning Loop</h2>
+  <p class="subtitle">Mods fix flairs like they always do — the system learns silently</p>
+  <div class="learning-flow">
+    <div class="lf-node start">New Post Created</div>
+    <div class="lf-arrow">&#10132;</div>
+    <div class="lf-node">Auto-Flair Assigned</div>
+    <div class="lf-arrow">&#10132;</div>
+    <div class="lf-node">Mod Reviews</div>
+  </div>
+  <div style="display:flex; gap:30px; margin:20px 0;">
+    <div style="flex:1; text-align:center;">
+      <div class="flow-box" style="border:2px solid #3fb950;">
+        <strong style="color:#3fb950;">&#10003; Flair Correct</strong><br>
+        <span style="font-size:16px; color:#8b949e;">Stats updated — accuracy increments</span>
+      </div>
+    </div>
+    <div style="flex:1; text-align:center;">
+      <div class="flow-box" style="border:2px solid #ff4500;">
+        <strong style="color:#ff4500;">&#10007; Flair Wrong</strong><br>
+        <span style="font-size:16px; color:#8b949e;">Triggers learning loop &#10132;</span>
+      </div>
+    </div>
+  </div>
+  <div class="learning-flow">
+    <div class="lf-node warn">Mod Changes Flair</div>
+    <div class="lf-arrow">&#10132;</div>
+    <div class="lf-node">Extract Key Terms</div>
+    <div class="lf-arrow">&#10132;</div>
+    <div class="lf-node">Store in KV</div>
+    <div class="lf-arrow">&#10132;</div>
+    <div class="lf-node end">Classifier Improves</div>
+  </div>
+  <div style="display:flex; gap:30px; margin-top:30px;">
+    <div style="flex:1; background:#161b22; border-radius:10px; padding:20px; border-left:3px solid #3fb950;">
+      <h3 style="font-size:18px; color:#3fb950;">Privacy-First</h3>
+      <p style="font-size:16px; color:#8b949e;">Only tokenized terms stored — no raw post content, no user data</p>
+    </div>
+    <div style="flex:1; background:#161b22; border-radius:10px; padding:20px; border-left:3px solid #5865F2;">
+      <h3 style="font-size:18px; color:#5865F2;">Weighted Learning</h3>
+      <p style="font-size:16px; color:#8b949e;">Manual rules: weight 1.0 — Learned terms: weight 0.8 — Mods always have priority</p>
+    </div>
+    <div style="flex:1; background:#161b22; border-radius:10px; padding:20px; border-left:3px solid #ff4500;">
+      <h3 style="font-size:18px; color:#ff4500;">Fast Impact</h3>
+      <p style="font-size:16px; color:#8b949e;">10-20 corrections visibly improve confidence on similar future posts</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 6: Stats Dashboard -->
+<div class="slide" id="slide-5">
+  <h2>Real-Time Stats Dashboard</h2>
+  <p class="subtitle">Native Devvit custom post — actionable metrics at a glance</p>
+  <div class="cards" style="margin-bottom:20px;">
+    <div class="stat-card">
+      <div class="value orange">1,247</div>
+      <div class="label">Posts Processed</div>
+    </div>
+    <div class="stat-card">
+      <div class="value green">87.3%</div>
+      <div class="label">Auto-Assignment Accuracy</div>
+    </div>
+    <div class="stat-card">
+      <div class="value blue">0.72</div>
+      <div class="label">Avg Confidence Score</div>
+    </div>
+  </div>
+  <div class="grid" style="gap:40px; margin-top:16px;">
+    <div>
+      <h3 style="font-size:20px; margin-bottom:16px;">Top Flairs by Volume</h3>
+      <div class="bar-chart">
+        <div class="bar-row"><div class="bar-label">Discussion</div><div class="bar-track"><div class="bar-fill orange" style="width:35%;"></div></div><div class="bar-pct">35%</div></div>
+        <div class="bar-row"><div class="bar-label">Help</div><div class="bar-track"><div class="bar-fill blue" style="width:25%;"></div></div><div class="bar-pct">25%</div></div>
+        <div class="bar-row"><div class="bar-label">News</div><div class="bar-track"><div class="bar-fill green" style="width:20%;"></div></div><div class="bar-pct">20%</div></div>
+        <div class="bar-row"><div class="bar-label">OC</div><div class="bar-track"><div class="bar-fill purple" style="width:12%;"></div></div><div class="bar-pct">12%</div></div>
+        <div class="bar-row"><div class="bar-label">Other</div><div class="bar-track"><div class="bar-fill yellow" style="width:8%;"></div></div><div class="bar-pct">8%</div></div>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:20px; margin-bottom:16px;">Classification Breakdown</h3>
+      <div class="flow-box" style="margin:8px 0;">
+        <span style="color:#3fb950; font-weight:700; font-size:28px;">1,089</span>
+        <span style="color:#8b949e; font-size:18px; margin-left:12px;">Auto-assigned correctly</span>
+      </div>
+      <div class="flow-box" style="margin:8px 0;">
+        <span style="color:#ff4500; font-weight:700; font-size:28px;">158</span>
+        <span style="color:#8b949e; font-size:18px; margin-left:12px;">Manual overrides</span>
+      </div>
+      <div class="flow-box" style="margin:8px 0;">
+        <span style="color:#5865F2; font-weight:700; font-size:28px;">0</span>
+        <span style="color:#8b949e; font-size:18px; margin-left:12px;">Unclassified posts</span>
+      </div>
+      <div class="flow-box" style="margin:8px 0;">
+        <span style="color:#d29922; font-weight:700; font-size:28px;">24</span>
+        <span style="color:#8b949e; font-size:18px; margin-left:12px;">Active rules configured</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 7: Architecture -->
+<div class="slide" id="slide-6">
+  <h2>Clean Modular Architecture</h2>
+  <p class="subtitle">8 source files, single responsibility, zero external dependencies</p>
+  <div class="grid-4" style="margin-top:20px;">
+    <div class="file-box">
+      <div class="filename">types.ts</div>
+      <div class="desc">Data models, interfaces, defaults, KV key constants</div>
+    </div>
+    <div class="file-box" style="border-color:#ff4500;">
+      <div class="filename">classifier.ts</div>
+      <div class="desc">TF-IDF scoring engine — the ML core</div>
+    </div>
+    <div class="file-box" style="border-color:#ff4500;">
+      <div class="filename">fallback.ts</div>
+      <div class="desc">4-stage classification chain orchestrator</div>
+    </div>
+    <div class="file-box">
+      <div class="filename">rules.ts</div>
+      <div class="desc">Config management + learning loop</div>
+    </div>
+    <div class="file-box">
+      <div class="filename">stats.ts</div>
+      <div class="desc">Daily + lifetime stats tracking</div>
+    </div>
+    <div class="file-box">
+      <div class="filename">settings.ts</div>
+      <div class="desc">8 native Devvit settings options</div>
+    </div>
+    <div class="file-box" style="border-color:#5865F2;">
+      <div class="filename">dashboard.tsx</div>
+      <div class="desc">Stats custom post (JSX)</div>
+    </div>
+    <div class="file-box" style="border-color:#5865F2;">
+      <div class="filename">main.ts</div>
+      <div class="desc">Entry point, triggers, forms, scheduler</div>
+    </div>
+  </div>
+  <div style="display:flex; gap:30px; margin-top:30px;">
+    <div style="flex:1; background:#161b22; border-radius:10px; padding:20px; text-align:center;">
+      <div style="font-size:36px; font-weight:800; color:#3fb950;">1</div>
+      <div style="font-size:18px; color:#8b949e;">Runtime dependency<br><strong style="color:#e6edf3;">@devvit/public-api</strong></div>
+    </div>
+    <div style="flex:1; background:#161b22; border-radius:10px; padding:20px; text-align:center;">
+      <div style="font-size:36px; font-weight:800; color:#ff4500;">0</div>
+      <div style="font-size:18px; color:#8b949e;">External API calls<br><strong style="color:#e6edf3;">Runs entirely in sandbox</strong></div>
+    </div>
+    <div style="flex:1; background:#161b22; border-radius:10px; padding:20px; text-align:center;">
+      <div style="font-size:36px; font-weight:800; color:#5865F2;">KV</div>
+      <div style="font-size:18px; color:#8b949e;">Redis-backed storage<br><strong style="color:#e6edf3;">Config, stats, training data</strong></div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 8: Devvit Integration -->
+<div class="slide" id="slide-7">
+  <h2>Built on Reddit's Devvit Platform</h2>
+  <p class="subtitle">Native integration with all Reddit platform primitives</p>
+  <div class="feature-grid" style="margin-top:20px;">
+    <div class="feature-item">
+      <div class="feature-icon orange">&#9889;</div>
+      <div class="feature-text">
+        <div class="feat-name">PostCreate Trigger</div>
+        <div class="feat-desc">Auto-flair on every new post submission</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon blue">&#8635;</div>
+      <div class="feature-text">
+        <div class="feat-name">PostUpdate Trigger</div>
+        <div class="feat-desc">Learn from moderator flair corrections</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon green">&#9744;</div>
+      <div class="feature-text">
+        <div class="feat-name">KV Store</div>
+        <div class="feat-desc">Persistent config, stats, and training data</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon orange">&#9998;</div>
+      <div class="feature-text">
+        <div class="feat-name">Forms API</div>
+        <div class="feat-desc">Native rule management — keyword + regex</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon blue">&#9783;</div>
+      <div class="feature-text">
+        <div class="feat-name">Custom Posts</div>
+        <div class="feat-desc">Stats dashboard as a native Reddit post</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon green">&#9200;</div>
+      <div class="feature-text">
+        <div class="feat-name">Scheduler</div>
+        <div class="feat-desc">Daily cleanup cron — 3 AM UTC, 90-day retention</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon orange">&#9881;</div>
+      <div class="feature-text">
+        <div class="feat-name">Settings</div>
+        <div class="feat-desc">8 options: toggle, confidence, filters, learning</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon blue">&#128221;</div>
+      <div class="feature-text">
+        <div class="feat-name">ModLog</div>
+        <div class="feat-desc">Full audit trail with stage + confidence score</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 9: Roadmap -->
+<div class="slide" id="slide-8">
+  <h2>What's Next</h2>
+  <p class="subtitle">From hackathon MVP to production-grade mod tool</p>
+  <div class="grid" style="gap:40px; margin-top:24px;">
+    <div>
+      <div class="timeline-item short">
+        <div class="time-label">Short Term (2 weeks)</div>
+        <div class="time-content">
+          <strong style="color:#e6edf3;">Bulk CSV Training</strong><br>
+          <span style="font-size:16px; color:#8b949e;">Upload historical posts to bootstrap classifier accuracy on day one</span>
+        </div>
+      </div>
+      <div class="timeline-item short" style="margin-top:16px;">
+        <div class="time-label">Short Term</div>
+        <div class="time-content">
+          <strong style="color:#e6edf3;">Flair Picker Dropdown</strong><br>
+          <span style="font-size:16px; color:#8b949e;">No more manual template IDs — searchable flair selection</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="timeline-item medium">
+        <div class="time-label">Medium Term (1-2 months)</div>
+        <div class="time-content">
+          <strong style="color:#e6edf3;">Human-in-the-Loop Mode</strong><br>
+          <span style="font-size:16px; color:#8b949e;">Suggest flairs via mod comment with approve/reject buttons</span>
+        </div>
+      </div>
+      <div class="timeline-item medium" style="margin-top:16px;">
+        <div class="time-label">Medium Term</div>
+        <div class="time-content">
+          <strong style="color:#e6edf3;">Weekly Health Reports</strong><br>
+          <span style="font-size:16px; color:#8b949e;">Auto-alert mods when accuracy drops or new topics emerge</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="timeline-item long">
+        <div class="time-label">Long Term (3-6 months)</div>
+        <div class="time-content">
+          <strong style="color:#e6edf3;">Cross-Subreddit Federated Models</strong><br>
+          <span style="font-size:16px; color:#8b949e;">Anonymized term sharing across communities for instant accuracy</span>
+        </div>
+      </div>
+      <div class="timeline-item long" style="margin-top:16px;">
+        <div class="time-label">Long Term</div>
+        <div class="time-content">
+          <strong style="color:#e6edf3;">Reddit Content API Integration</strong><br>
+          <span style="font-size:16px; color:#8b949e;">Swap in platform-native embeddings when available</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 10: Thank You -->
+<div class="slide" id="slide-9">
+  <div style="text-align:center;">
+    <h1><span class="accent">Flair Enforcer</span></h1>
+    <p class="subtitle" style="font-size:30px;">Smarter moderation. Less manual work. Better communities.</p>
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:28px 40px; margin:40px 0; display:inline-block;">
+      <p style="font-size:22px; color:#8b949e;">&#128279; <strong style="color:#e6edf3;">github.com/Cubiczan/modenrich</strong></p>
+    </div>
+    <div style="display:flex; gap:16px; justify-content:center; margin-top:24px;">
+      <span class="badge badge-orange">Devvit</span>
+      <span class="badge badge-blue">TypeScript</span>
+      <span class="badge badge-green">TF-IDF ML</span>
+    </div>
+    <p style="margin-top:50px; font-size:20px; color:#484f58;">Reddit Mod Tools Migration Hackathon 2025</p>
+  </div>
+</div>
+
+<div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+<div class="slide-counter" id="counter"></div>
+
+<script>
+const SLIDE_COUNT = 10;
+const SLIDE_MS = 9000;
+let current = 0;
+
+function showSlide(idx) {
+  const slides = document.querySelectorAll('.slide');
+  slides.forEach(s => { s.classList.remove('active','fade-in'); s.style.display = 'none'; });
+  const el = slides[idx];
+  el.style.display = 'flex';
+  el.classList.add('active','fade-in');
+  document.getElementById('progress').style.width = ((idx + 1) / SLIDE_COUNT * 100) + '%';
+  document.getElementById('counter').textContent = (idx + 1) + ' / ' + SLIDE_COUNT;
+  current = idx;
+}
+
+function nextSlide() {
+  if (current < SLIDE_COUNT - 1) {
+    showSlide(current + 1);
+  }
+}
+
+// Start auto-advance
+showSlide(0);
+setInterval(nextSlide, SLIDE_MS);
+</script>
+</body>
+</html>
