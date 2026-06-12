@@ -6,11 +6,12 @@
  * produce summary data for the dashboard.
  */
 
-import { Context } from '@devvit/public-api';
+import { TriggerContext } from '@devvit/public-api';
 import {
   DailyStats,
   ClassificationEvent,
   KV_KEYS,
+  PrefixedKVStore,
 } from './types.js';
 
 /** Get today's date string in YYYY-MM-DD format. */
@@ -22,13 +23,13 @@ function todayKey(): string {
  * Increment daily stats counters after a classification event.
  */
 export async function recordClassification(
-  ctx: Context,
+  ctx: TriggerContext,
   event: ClassificationEvent,
 ): Promise<void> {
   const dayKey = KV_KEYS.statsPrefix + todayKey();
 
   // Load existing daily stats
-  const raw = await ctx.kvStore.get(dayKey);
+  const raw = await ctx.kvStore.get<string>(dayKey);
   const stats: DailyStats = raw
     ? JSON.parse(raw)
     : {
@@ -68,12 +69,12 @@ export async function recordClassification(
  * Record that a mod manually overrode an auto-flair classification.
  */
 export async function recordOverride(
-  ctx: Context,
+  ctx: TriggerContext,
   postId: string,
   overrideFlairId: string,
 ): Promise<void> {
   const dayKey = KV_KEYS.statsPrefix + todayKey();
-  const raw = await ctx.kvStore.get(dayKey);
+  const raw = await ctx.kvStore.get<string>(dayKey);
   if (raw) {
     const stats: DailyStats = JSON.parse(raw);
     stats.manualOverride += 1;
@@ -83,9 +84,9 @@ export async function recordOverride(
   // Update the original event
   // We don't know the event ID from postId directly, so we use a lookup key
   const lookupKey = `fe:post:${postId}`;
-  const eventId = await ctx.kvStore.get(lookupKey);
+  const eventId = await ctx.kvStore.get<string>(lookupKey);
   if (eventId) {
-    const eventRaw = await ctx.kvStore.get(KV_KEYS.eventsPrefix + eventId);
+    const eventRaw = await ctx.kvStore.get<string>(KV_KEYS.eventsPrefix + eventId);
     if (eventRaw) {
       const event: ClassificationEvent = JSON.parse(eventRaw);
       event.overridden = true;
@@ -99,11 +100,11 @@ export async function recordOverride(
  * Retrieve stats for a given day (or today).
  */
 export async function getDailyStats(
-  ctx: Context,
+  ctx: TriggerContext,
   date?: string,
 ): Promise<DailyStats | null> {
   const key = KV_KEYS.statsPrefix + (date || todayKey());
-  const raw = await ctx.kvStore.get(key);
+  const raw = await ctx.kvStore.get<string>(key);
   return raw ? JSON.parse(raw) : null;
 }
 
@@ -111,7 +112,7 @@ export async function getDailyStats(
  * Retrieve stats for the last N days.
  */
 export async function getStatsRange(
-  ctx: Context,
+  ctx: TriggerContext,
   days: number,
 ): Promise<DailyStats[]> {
   const results: DailyStats[] = [];
@@ -119,7 +120,7 @@ export async function getStatsRange(
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = KV_KEYS.statsPrefix + d.toISOString().split('T')[0];
-    const raw = await ctx.kvStore.get(key);
+    const raw = await ctx.kvStore.get<string>(key);
     if (raw) results.push(JSON.parse(raw));
   }
   return results;
@@ -128,7 +129,7 @@ export async function getStatsRange(
 /**
  * Get total lifetime stats by summing all daily entries.
  */
-export async function getLifetimeStats(ctx: Context): Promise<{
+export async function getLifetimeStats(ctx: TriggerContext): Promise<{
   totalPosts: number;
   autoAssigned: number;
   unclassified: number;
@@ -136,7 +137,7 @@ export async function getLifetimeStats(ctx: Context): Promise<{
   avgConfidence: number;
   topFlairs: { id: string; count: number }[];
 }> {
-  const allDays = await ctx.kvStore.getByPrefix(KV_KEYS.statsPrefix);
+  const allDays = await (ctx.kvStore as unknown as PrefixedKVStore).getByPrefix(KV_KEYS.statsPrefix);
   let totalPosts = 0;
   let autoAssigned = 0;
   let unclassified = 0;

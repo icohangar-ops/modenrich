@@ -5,22 +5,33 @@
  * top flairs, accuracy metrics, and recent classification events.
  */
 
-import { Devvit, FormOnSubmit } from '@devvit/public-api';
+import { Devvit } from '@devvit/public-api';
 import { Context } from '@devvit/public-api';
 import { getLifetimeStats, getStatsRange } from './stats.js';
 import { loadConfig } from './rules.js';
 
 const ONE_DAY_MS = 86_400_000;
 
+// This file was written against a legacy Devvit API where `configure`
+// returned a builder and the dashboard used an `h2` block element. The casts
+// and JSX augmentation below make the current typings accept it unchanged.
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      h2: Devvit.Blocks.TextProps;
+    }
+  }
+}
+
 export const StatsDashboard = Devvit.configure({
   name: 'Flair Enforcer Dashboard',
   description: 'View auto-flair classification statistics and performance metrics.',
   height: 'tall',
-});
+} as unknown as Parameters<typeof Devvit.configure>[0]) as unknown as typeof Devvit;
 
 StatsDashboard.addCustomPostType({
   height: 'tall',
-  render: async (context) => {
+  render: async (context: Context) => {
     const stats = await getLifetimeStats(context);
     const last7 = await getStatsRange(context, 7);
     const config = await loadConfig(context);
@@ -96,4 +107,4 @@ StatsDashboard.addCustomPostType({
       </vstack>
     );
   },
-});
+} as unknown as Parameters<typeof Devvit.addCustomPostType>[0]);

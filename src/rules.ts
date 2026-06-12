@@ -7,12 +7,13 @@
  *   - Managing the trained keyword→flair corpus.
  */
 
-import { Context } from '@devvit/public-api';
+import { TriggerContext } from '@devvit/public-api';
 import {
   ClassificationConfig,
   ClassificationEvent,
   DEFAULT_CONFIG,
   KV_KEYS,
+  PrefixedKVStore,
 } from './types.js';
 import { tokenise } from './classifier.js';
 
@@ -20,8 +21,8 @@ import { tokenise } from './classifier.js';
  * Load the classification config from KV store.
  * Returns defaults if nothing is stored yet.
  */
-export async function loadConfig(ctx: Context): Promise<ClassificationConfig> {
-  const raw = await ctx.kvStore.get(KV_KEYS.config);
+export async function loadConfig(ctx: TriggerContext): Promise<ClassificationConfig> {
+  const raw = await ctx.kvStore.get<string>(KV_KEYS.config);
   if (!raw) return { ...DEFAULT_CONFIG };
   return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
 }
@@ -29,7 +30,7 @@ export async function loadConfig(ctx: Context): Promise<ClassificationConfig> {
 /**
  * Save the classification config to KV store.
  */
-export async function saveConfig(ctx: Context, config: ClassificationConfig): Promise<void> {
+export async function saveConfig(ctx: TriggerContext, config: ClassificationConfig): Promise<void> {
   await ctx.kvStore.put(KV_KEYS.config, JSON.stringify(config));
 }
 
@@ -44,7 +45,7 @@ export async function saveConfig(ctx: Context, config: ClassificationConfig): Pr
  * @param correctFlairId  The flair the mod chose (the correct one).
  */
 export async function trainFromCorrection(
-  ctx: Context,
+  ctx: TriggerContext,
   title: string,
   body: string,
   correctFlairId: string,
@@ -54,7 +55,7 @@ export async function trainFromCorrection(
 
   // Load existing trained data for this flair
   const key = KV_KEYS.trainedPrefix + correctFlairId;
-  const raw = await ctx.kvStore.get(key);
+  const raw = await ctx.kvStore.get<string>(key);
   const termCounts: Record<string, number> = raw ? JSON.parse(raw) : {};
 
   // Add tokens (with a count to allow future TF-IDF weighting)
@@ -70,10 +71,10 @@ export async function trainFromCorrection(
  * Returns a map of term → flairId[] (which flairs each term is associated with).
  */
 export async function loadTrainedTerms(
-  ctx: Context,
+  ctx: TriggerContext,
 ): Promise<Map<string, string[]>> {
   const result = new Map<string, string[]>();
-  const entries = await ctx.kvStore.getByPrefix(KV_KEYS.trainedPrefix);
+  const entries = await (ctx.kvStore as unknown as PrefixedKVStore).getByPrefix(KV_KEYS.trainedPrefix);
 
   for (const { key, value } of entries) {
     // Extract flair ID from key (format: "fe:trained:{flairId}")

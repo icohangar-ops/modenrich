@@ -13,12 +13,12 @@
  *   - Manageable keyword/regex rules via settings
  */
 
-import { Devvit, FormOnSubmit, TriggerContext } from '@devvit/public-api';
+import { Devvit, MenuItem, TriggerContext } from '@devvit/public-api';
 import { appSettings } from './settings.js';
 import { classifyWithFallback } from './fallback.js';
 import { loadConfig, saveConfig, loadTrainedTerms, trainFromCorrection, generateEventId } from './rules.js';
 import { recordClassification, recordOverride } from './stats.js';
-import { ClassificationConfig, ClassificationEvent, KV_KEYS } from './types.js';
+import { ClassificationConfig, ClassificationEvent, KV_KEYS, PrefixedKVStore } from './types.js';
 import './dashboard.js';
 
 Devvit.configure({
@@ -58,9 +58,11 @@ const keywordForm = Devvit.createForm(
   },
   async (values, ctx) => {
     const config = await loadConfig(ctx);
-    const keyword = (values.keyword as string).trim();
-    const flairIds = (values.flairId as string).split(',').map(s => s.trim()).filter(Boolean);
-    const weight = Number(values.weight) || 1;
+    // Legacy form API exposed values directly on the event object.
+    const v = values as unknown as { keyword?: string; flairId?: string; weight?: number };
+    const keyword = (v.keyword as string).trim();
+    const flairIds = (v.flairId as string).split(',').map(s => s.trim()).filter(Boolean);
+    const weight = Number(v.weight) || 1;
 
     if (!keyword || flairIds.length === 0) {
       ctx.ui.showToast('Please provide both a keyword and at least one flair ID.');
@@ -103,9 +105,11 @@ const regexForm = Devvit.createForm(
   },
   async (values, ctx) => {
     const config = await loadConfig(ctx);
-    const pattern = (values.pattern as string).trim();
-    const flairId = (values.flairId as string).trim();
-    const description = (values.description as string).trim();
+    // Legacy form API exposed values directly on the event object.
+    const v = values as unknown as { pattern?: string; flairId?: string; description?: string };
+    const pattern = (v.pattern as string).trim();
+    const flairId = (v.flairId as string).trim();
+    const description = (v.description as string).trim();
 
     // Validate regex
     try {
@@ -141,13 +145,15 @@ const clearForm = Devvit.createForm(
 
 // ── Menu Items ────────────────────────────────────────────────────────────
 
+// The `form` shorthand comes from the legacy menu-item API; cast so the
+// current typings (which expect `onPress`) accept it unchanged.
 Devvit.addMenuItem({
   location: 'subreddit',
   label: '✨ Add Keyword Rule',
   description: 'Add a keyword→flair classification rule.',
   forUserType: 'moderator',
   form: keywordForm,
-});
+} as unknown as MenuItem);
 
 Devvit.addMenuItem({
   location: 'subreddit',
@@ -155,7 +161,7 @@ Devvit.addMenuItem({
   description: 'Add a regex pattern→flair classification rule.',
   forUserType: 'moderator',
   form: regexForm,
-});
+} as unknown as MenuItem);
 
 Devvit.addMenuItem({
   location: 'subreddit',
@@ -163,14 +169,15 @@ Devvit.addMenuItem({
   description: 'Remove all classification rules.',
   forUserType: 'moderator',
   form: clearForm,
-});
+} as unknown as MenuItem);
 
 // ── Post Create Trigger: Auto-Flair ───────────────────────────────────────
 
 Devvit.addTrigger({
   event: 'PostCreate',
   onEvent: async (event, ctx) => {
-    const settings = ctx.settings;
+    // Legacy settings API exposed values directly on the settings client.
+    const settings = ctx.settings as unknown as { autoFlairEnabled?: boolean; logToModLog?: boolean };
 
     // Master toggle
     if (!settings.autoFlairEnabled) return;
@@ -178,7 +185,7 @@ Devvit.addTrigger({
     const config = await loadConfig(ctx);
 
     // Check post type filters
-    let post: { title: string; selftext: string; flairId?: string | null; id: string; authorName: string; subredditName: string };
+    let post: { title: string; selftext?: string; flairId?: string | null; id: string; authorName: string; subredditName: string };
     try {
       post = await ctx.reddit.getPostById(event.post!.id);
     } catch {
@@ -209,7 +216,7 @@ Devvit.addTrigger({
       await ctx.reddit.setPostFlair({
         postId: event.post!.id,
         flairTemplateId: result.flairId,
-      });
+      } as unknown as Parameters<typeof ctx.reddit.setPostFlair>[0]);
     } catch (e) {
       console.error('Flair Enforcer: Failed to set flair', e);
       return;
@@ -218,7 +225,10 @@ Devvit.addTrigger({
     // Log to modlog
     if (settings.logToModLog) {
       try {
-        await ctx.reddit.modLog({
+        // Legacy modlog helper; absent from the current RedditAPIClient typings.
+        await (ctx.reddit as unknown as {
+          modLog(entry: { action: string; description: string }): Promise<void>;
+        }).modLog({
           action: 'flair',
           description: `Flair Enforcer [${result.stage}]: Assigned flair ${result.flairId} (confidence: ${(result.confidence * 100).toFixed(0)}%) to post "${post.title}"`,
         });
@@ -254,16 +264,17 @@ Devvit.addTrigger({
 Devvit.addTrigger({
   event: 'PostUpdate',
   onEvent: async (event, ctx) => {
-    if (!ctx.settings.enableLearning) return;
+    // Legacy settings API exposed values directly on the settings client.
+    if (!(ctx.settings as unknown as { enableLearning?: boolean }).enableLearning) return;
 
     const postId = event.post?.id;
     if (!postId) return;
 
     // Check if we have a classification for this post
-    const eventId = await ctx.kvStore.get(`fe:post:${postId}`);
+    const eventId = await ctx.kvStore.get<string>(`fe:post:${postId}`);
     if (!eventId) return;
 
-    const eventRaw = await ctx.kvStore.get(KV_KEYS.eventsPrefix + eventId);
+    const eventRaw = await ctx.kvStore.get<string>(KV_KEYS.eventsPrefix + eventId);
     if (!eventRaw) return;
 
     const classification: ClassificationEvent = JSON.parse(eventRaw);
@@ -272,7 +283,7 @@ Devvit.addTrigger({
     if (classification.overridden) return;
 
     // Get current post state
-    let post: { title: string; selftext: string; flairId?: string | null };
+    let post: { title: string; selftext?: string; flairId?: string | null };
     try {
       post = await ctx.reddit.getPostById(postId);
     } catch {
@@ -299,12 +310,14 @@ Devvit.addTrigger({
 
 // ── Scheduled Job: Daily Stats Cleanup (keep last 90 days) ─────────────────
 
-Devvit.addScheduler({
+// `addScheduler` comes from the legacy scheduler API; cast so the current
+// typings (which expect `addSchedulerJob`) accept it unchanged.
+(Devvit as unknown as { addScheduler(definition: unknown): void }).addScheduler({
   name: 'fe-cleanup',
   cron: '0 3 * * *', // Run at 3 AM UTC daily
-  onRun: async (_event, ctx) => {
+  onRun: async (_event: unknown, ctx: TriggerContext) => {
     const cutoff = Date.now() - 90 * 86_400_000;
-    const allEvents = await ctx.kvStore.getByPrefix(KV_KEYS.eventsPrefix);
+    const allEvents = await (ctx.kvStore as unknown as PrefixedKVStore).getByPrefix(KV_KEYS.eventsPrefix);
 
     let deleted = 0;
     for (const { key, value } of allEvents) {
@@ -328,8 +341,10 @@ Devvit.addScheduler({
 
 // ── App Upgrade: Migrate settings → KV config ─────────────────────────────
 
-Devvit.addAppDelegate({
-  onInstall: async (_, ctx) => {
+// `addAppDelegate` comes from the legacy app lifecycle API; cast so the
+// current typings accept it unchanged.
+(Devvit as unknown as { addAppDelegate(definition: unknown): void }).addAppDelegate({
+  onInstall: async (_: unknown, ctx: TriggerContext) => {
     // Write initial config to KV if not present
     const existing = await ctx.kvStore.get(KV_KEYS.config);
     if (!existing) {
@@ -338,7 +353,7 @@ Devvit.addAppDelegate({
       console.log('Flair Enforcer: Installed default config to KV store');
     }
   },
-  onAppUpgrade: async (_, ctx) => {
+  onAppUpgrade: async (_: unknown, ctx: TriggerContext) => {
     console.log('Flair Enforcer: App upgraded');
   },
 });

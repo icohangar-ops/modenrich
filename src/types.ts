@@ -100,6 +100,15 @@ export const DEFAULT_CONFIG: ClassificationConfig = {
   excludeSubreddits: [],
 };
 
+/**
+ * Shape of the prefix-scan KV API this app was written against, which is not
+ * part of the published `@devvit/public-api` typings. Used only for casts so
+ * the code type-checks; runtime behavior is unchanged.
+ */
+export interface PrefixedKVStore {
+  getByPrefix(prefix: string): Promise<Array<{ key: string; value: string }>>;
+}
+
 /** Key prefixes for KV storage. */
 export const KV_KEYS = {
   config: 'fe:config',
