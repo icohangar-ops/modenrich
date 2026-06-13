@@ -19,6 +19,7 @@ import {
   KV_KEYS,
 } from './types.js';
 import { classifyPost } from './classifier.js';
+import { capRegexInput, compileSafeRegex } from './lib/resilience/index.js';
 
 /**
  * Stage 2: Exact keyword matching.
@@ -61,11 +62,16 @@ function regexFallback(
   body: string,
   config: ClassificationConfig,
 ): ClassificationResult | null {
-  const text = `${title} ${body}`;
+  // ReDoS safeguard: cap untrusted post text before any regex evaluation.
+  // Devvit's sandbox already imposes a CPU limit; the truncation bounds the
+  // worst-case cost of catastrophic backtracking on attacker-shaped input.
+  const text = capRegexInput(`${title} ${body}`);
 
   for (const rule of config.regexRules) {
     try {
-      const regex = new RegExp(rule.pattern, 'i');
+      // compileSafeRegex rejects known catastrophic-backtracking shapes and
+      // invalid patterns (throws), matching the previous try/catch skip.
+      const regex = compileSafeRegex(rule.pattern);
       if (regex.test(text)) {
         return {
           flairId: rule.flairId,

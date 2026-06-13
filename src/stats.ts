@@ -58,11 +58,17 @@ export async function recordClassification(
     stats.unclassified += 1;
   }
 
-  await ctx.kvStore.put(dayKey, JSON.stringify(stats));
-
-  // Store individual event
+  // Atomicity note: Devvit KV has no multi-key transaction, so these two writes
+  // cannot be made truly atomic. We instead write the durable event record
+  // FIRST (it is the source of truth used by history + the cleanup job), then
+  // the derived daily counter. That ordering ensures that if the second write
+  // fails, the worst case is an under-counted stat for an event that still
+  // exists and is recoverable — rather than a counted stat with no event record
+  // (an orphaned increment the cleanup job can never reconcile).
   const eventKey = KV_KEYS.eventsPrefix + event.id;
   await ctx.kvStore.put(eventKey, JSON.stringify(event));
+
+  await ctx.kvStore.put(dayKey, JSON.stringify(stats));
 }
 
 /**

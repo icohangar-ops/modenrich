@@ -19,6 +19,7 @@ import { classifyWithFallback } from './fallback.js';
 import { loadConfig, saveConfig, loadTrainedTerms, trainFromCorrection, generateEventId } from './rules.js';
 import { recordClassification, recordOverride } from './stats.js';
 import { ClassificationConfig, ClassificationEvent, KV_KEYS, PrefixedKVStore } from './types.js';
+import { trySafeRegex } from './lib/resilience/index.js';
 import './dashboard.js';
 
 Devvit.configure({
@@ -111,16 +112,18 @@ const regexForm = Devvit.createForm(
     const flairId = (v.flairId as string).trim();
     const description = (v.description as string).trim();
 
-    // Validate regex
-    try {
-      new RegExp(pattern, 'i');
-    } catch {
-      ctx.ui.showToast(`Invalid regex pattern: ${pattern}`);
+    if (!pattern || !flairId) {
+      ctx.ui.showToast('Please provide both a pattern and flair ID.');
       return;
     }
 
-    if (!pattern || !flairId) {
-      ctx.ui.showToast('Please provide both a pattern and flair ID.');
+    // Validate regex at the input boundary: rejects invalid patterns AND
+    // ReDoS-prone shapes (nested unbounded quantifiers) before they are stored
+    // and later run against untrusted post text. Fails closed — bad pattern is
+    // never persisted.
+    const safe = trySafeRegex(pattern);
+    if (!safe.ok) {
+      ctx.ui.showToast(`Rejected regex pattern: ${safe.reason}`);
       return;
     }
 
