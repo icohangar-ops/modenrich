@@ -16,5 +16,8 @@
   "devDependencies": {
     "typescript": "5.3.3",
     "devvit": "^0.11.0"
+  },
+  "overrides": {
+    "protobufjs": "7.6.6"
   }
 }
